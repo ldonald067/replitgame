@@ -1,0 +1,111 @@
+Here is an example game utilizing Turbo SDK, which models a "Bento Box" game. This game requires catching falling bento pieces and placing them correctly in the bento slots. 
+
+```rust
+// Define the game configuration using the turbo::cfg! macro
+turbo::cfg! {r#"
+    name = "Bento Box"
+    version = "1.0.0"
+    author = "Turbo"
+    description = "Catch falling bento pieces and place them in the right slots!"
+    [settings]
+    resolution = [256, 144]
+"#}
+
+// Define the game state initialization using the turbo::init! macro
+turbo::init! {
+    struct GameState {
+        frame: u32,
+        score: u32,
+        player_x: f32,
+        bento_pieces: Vec<struct BentoPiece {
+            x: f32,
+            y: f32,
+            vel: f32,
+            piece_type: u32,  // Different bento piece types are represented by different numbers
+        }>,
+    } = {
+        Self {
+            frame: 0,
+            score: 0,
+            player_x: 128.0,
+            bento_pieces: vec![],
+        }
+    }
+}
+
+// Implement the game loop using the turbo::go! macro
+turbo::go! {
+    // Load the game state
+    let mut state = GameState::load();
+
+    // Handle user input
+    if gamepad(0).left.pressed() {
+        state.player_x -= 2.;
+    }
+    if gamepad(0).right.pressed() {
+        state.player_x += 2.;
+    }
+
+    // Generate new bento pieces at random intervals
+    if rand() % 64 == 0 {
+        // Create a new bento piece with random attributes
+        let bento_piece = BentoPiece {
+            x: (rand() % 256) as f32,
+            y: 0.0,
+            vel: (rand() % 3 + 1) as f32,
+            piece_type: (rand() % 4) as u32,
+        };
+        state.bento_pieces.push(bento_piece);
+    }
+
+    // Update bento pieces positions and check for collisions with the player
+    state.bento_pieces.retain_mut(|bento_piece| {
+        bento_piece.y += bento_piece.vel;
+
+        // Check for collision with the player platform
+        if (bento_piece.y as f32 + 10.0) >= 110.0 && (bento_piece.x >= state.player_x - 10.0 && bento_piece.x <= state.player_x + 10.0) {
+            // Bento piece is caught
+            state.score += 1;
+            false // Remove the bento piece from the game
+        } else if bento_piece.y < 144.0 + 10.0 {
+            true // Keep the bento piece in the game if it's within the screen
+        } else {
+            false // Remove the bento piece if it's off-screen
+        }
+    });
+
+    // Set the background color
+    clear(0x00ffffff);
+
+    // Draw the player as a platform
+    rect!(state.player_x as i32 - 10, 110, 20, 10, 0x000000ff);
+
+    // Draw the falling bento pieces
+    for bento_piece in &state.bento_pieces {
+        match bento_piece.piece_type {
+            0 => {
+                rect!(bento_piece.x as i32, bento_piece.y as i32, 10, 10, 0xff0000ff); // Represent one type of bento piece as a red square
+            }
+            1 => {
+                rect!(bento_piece.x as i32, bento_piece.y as i32, 10, 10, 0x00ff00ff); // Represent another type of bento piece as a green square
+            }
+            2 => {
+                rect!(bento_piece.x as i32, bento_piece.y as i32, 10, 10, 0x0000ffff); // Represent another type of bento piece as a blue square
+            }
+            3 => {
+                rect!(bento_piece.x as i32, bento_piece.y as i32, 10, 10, 0xffff00ff); // Represent another type of bento piece as a yellow square
+            }
+            _ => { }
+        }
+    }
+
+    // Draw the score
+    text!(&format!("Score: {}", state.score), x = 10, y = 10, font = Font::L, color = 0xffffffff); // Render the score
+
+    // Save game state for the next frame
+    state.frame += 1;
+    state.save();
+}
+```
+
+This example creates a simple bento box game where the player catches falling pieces of bentos by moving a platform left and right. The game continuously generates bento pieces, each of a different type represented by different colors, and increments the score whenever a piece is caught. The game persists the state across frames and includes logic for collision detection and rendering the platform, the bento pieces, and the score.
